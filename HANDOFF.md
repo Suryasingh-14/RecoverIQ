@@ -176,3 +176,105 @@ python evaluation/baseline.py
 ```
 
 Python 3.10+ with `pandas` and `numpy`.
+
+## Phase 2: ML Model
+
+### Prediction API
+
+The public prediction function is:
+
+```python
+predict_recovery_probability(payment_row: RowLike) -> float
+```
+
+It returns `P(payment_recovered | features, intervention=retry)` as a float in `[0, 1]`.
+
+`payment_row` may be a `dict`, `pandas.Series`, or namedtuple containing the `payments.csv` columns. It must contain the required model feature columns; extra keys are ignored. The model internally converts the row to a one-row DataFrame and calls `predict_proba(...)[0, 1]`.
+
+### Saved model
+
+`models/recovery_model.pkl` is a **joblib payload dictionary**, not a raw scikit-learn estimator.
+
+The saved dictionary has this structure:
+
+```python
+{
+    "pipeline": <sklearn Pipeline>,
+    "feature_columns": [...],
+    "categorical_features": [...],
+    "numeric_features": [...],
+    "target": <target column name>,
+    "label_intervention": "retry",
+    "metadata": {
+        "chosen_name": <chosen model name>,
+        "test_auc": {
+            "logistic_regression": <AUC>,
+            "random_forest": <AUC>,
+        },
+    },
+}
+```
+
+To load it directly:
+
+```python
+import joblib
+
+payload = joblib.load("models/recovery_model.pkl")
+pipeline = payload["pipeline"]
+```
+
+The project loader `load_recovery_model()` already unwraps this dictionary and returns the stored sklearn `Pipeline`.
+
+### Test-set metrics
+
+Evaluation uses a 20% test split with `random_state=42` and stratification.
+
+**Chosen model — Logistic Regression**
+
+| Metric | Score |
+|---|---:|
+| AUC-ROC | 0.8932 |
+| Accuracy | 0.8313 |
+| Precision | 0.7611 |
+| Recall | 0.8782 |
+
+**Alternative — Random Forest**
+
+| Metric | Score |
+|---|---:|
+| AUC-ROC | 0.8910 |
+
+Logistic regression is preferred because its AUC is slightly higher and it is simpler and more interpretable.
+
+### Training / oracle boundary
+
+The Phase 2 training data is specifically a **retry-policy dataset**. Labels are generated with:
+
+```python
+simulate_outcome(row, intervention="retry")
+```
+
+`data/recoverability.py` (the oracle) was **not imported or used for training**. Training labels come only from the public simulator's `simulate_outcome()` function.
+
+This distinction is important: the resulting probability is specifically for the **retry intervention**, not an intervention-agnostic probability of recovery.
+
+### Calibration
+
+Calibration is good: across predicted-probability deciles, the predicted probabilities closely match the observed/actual recovery rates. The evaluation code explicitly compares mean predicted probability with actual recovery rate for each decile.
+
+### Phase 3 caveats — Expected Value calculator
+
+Phase 3 must not treat `predict_recovery_probability()` as a probability that applies equally to every possible intervention.
+
+The current model estimates recovery probability for **`retry` only**. The simulator supports `retry`, `payment_link`, `notification`, `escalate`, and `stop`, with different intervention effects.
+
+Therefore, an Expected Value calculator should:
+
+- Treat the current ML probability as `P(recovery | features, intervention=retry)`.
+- Not reuse the retry probability unchanged for `payment_link`, `notification`, or `escalate`.
+- Treat `stop` as no recovery according to the simulator.
+- Incorporate the payment `amount` and intervention-specific outcomes when calculating expected recovered value.
+- Keep the model probability and the simulator/oracle's intervention-specific probabilities conceptually separate.
+- If Phase 3 needs to compare interventions, a future model/policy should provide intervention-specific estimates (or otherwise obtain reliable intervention-specific recovery probabilities) before using `argmax` expected value across actions.
+
