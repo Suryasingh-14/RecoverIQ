@@ -278,3 +278,135 @@ Therefore, an Expected Value calculator should:
 - Keep the model probability and the simulator/oracle's intervention-specific probabilities conceptually separate.
 - If Phase 3 needs to compare interventions, a future model/policy should provide intervention-specific estimates (or otherwise obtain reliable intervention-specific recovery probabilities) before using `argmax` expected value across actions.
 
+---
+
+## Phase 3: Expected Value + Decision Engine
+
+Adds `engine/expected_value.py` and `engine/decision_engine.py`, plus
+`evaluation/ml_strategy.py`. Does not modify any Phase 1 or Phase 2 file.
+
+### Expected Value API
+
+```python
+from engine.expected_value import calculate_expected_value
+
+calculate_expected_value(
+    payment_row,
+    intervention,          # retry | payment_link | notification | escalate | stop
+    retry_cost=5,
+    notification_cost=2,
+    payment_link_cost=3,
+    escalate_cost=50,
+    incentive_pct=0.0,
+) -> dict   # {intervention, probability_used, expected_value, cost}
+```
+
+`expected_value = (P(recovery) * amount * (1 - incentive_pct)) - intervention_cost`
+
+Probability source per intervention (see Phase 2's "Phase 3 caveats" above,
+which this implementation follows directly):
+
+| Intervention | `probability_used` comes from |
+|---|---|
+| `retry` | `models/recovery_model.py: predict_recovery_probability(row)` |
+| `payment_link`, `notification`, `escalate` | `data/simulator.py: simulate_outcome(row, intervention)["recovery_probability"]`, called **once** per intervention |
+| `stop` | `0.0` (simulator not called) |
+
+For the three simulator-priced interventions, only the `recovery_probability`
+field is read — the sampled boolean `payment_recovered` from that call is
+discarded. This keeps the decision deterministic-in-expectation and avoids
+leaking simulator randomness into the choice of action.
+
+### Decision Engine API
+
+```python
+from engine.decision_engine import decide_best_action
+
+decide_best_action(payment_row, guardrail_config=None) -> dict
+# {payment_id, decision, expected_value, reason, all_evaluated}
+```
+
+`all_evaluated` is the list of all five `calculate_expected_value()` result
+dicts (one per intervention), included for audit/transparency regardless of
+which one was chosen.
+
+### Hardcoded business rules (Phase 5 should formalize these)
+
+Evaluated **before** the EV comparison, in this order; the first one that
+matches wins and skips the `argmax` step entirely:
+
+1. **High amount → escalate.** If `amount > 50000`, force `"escalate"`
+   regardless of EV (routes to human review). Threshold and forced action are
+   in `DEFAULT_GUARDRAIL_CONFIG` (`high_amount_threshold`, `high_amount_action`)
+   and can be overridden via `guardrail_config`.
+2. **Repeated hard decline → stop.** If `failure_reason == "hard_decline"` and
+   `previous_failures >= 3`, force `"stop"` (don't keep spending on a customer
+   who has already hard-declined repeatedly). Config keys:
+   `hard_decline_repeat_failures`, `hard_decline_repeat_action`.
+
+Both rules are isolated in `engine.decision_engine._apply_guardrails` so
+Phase 5 can replace that one function with a real guardrail engine without
+touching `calculate_expected_value` or the EV comparison logic.
+
+### Evaluation — `evaluation/ml_strategy.py`
+
+```bash
+python evaluation/ml_strategy.py
+```
+
+For every row: `decide_best_action()` picks an intervention, then
+`simulate_outcome(row, decision)` is called **once** to realize the actual
+outcome for revenue/recovery-rate accounting. Peeking at the realized boolean
+outcome is only done here, post-decision, for evaluation — never inside
+`calculate_expected_value` or `decide_best_action` themselves.
+
+**Evaluation results:** not yet populated. `data/generator.py`,
+`data/recoverability.py`, and the trained `models/recovery_model.pkl` /
+`models/training_data.csv` used for this handoff's Phase 1/2 numbers were not
+available while building Phase 3, so `evaluation/ml_strategy.py` has not been
+run against the real seed-42 dataset and model yet. Run it in the real
+environment (after `python data/generator.py`, `python
+models/train_data_builder.py`, `python models/recovery_model.py`) and record
+the output here alongside the existing baselines:
+
+| Strategy | Revenue recovered | Recovery rate |
+|----------|-------------------|---------------|
+| `naive_strategy` | 6,030,389.05 | 42.43% |
+| `rule_based_strategy` | 7,070,455.81 | 50.07% |
+| `ml_strategy` (Phase 3) | *(run `evaluation/ml_strategy.py` and fill in)* | *(fill in)* |
+
+The engine code was verified independently against a locally reconstructed
+stand-in dataset/oracle/model (not the repo's real Phase 1/2 artifacts): it
+correctly picks `retry` on transient failures, forces `escalate` above the
+amount threshold, forces `stop` on repeated hard declines, and its decision
+mix spans all five interventions — so the logic is sound. Only the *numbers*
+in the table above are pending a run against the real files.
+
+### Caveats for Phase 4 (AI Agent)
+
+- **Call these functions, don't reimplement EV logic.** The agent should call
+  `decide_best_action()` (or `calculate_expected_value()` directly for
+  single-intervention queries) rather than re-deriving expected value or
+  re-reading probabilities itself. This keeps the retry/simulator probability
+  split, the cost constants, and the guardrails in one place.
+- **The `retry` probability is the only ML-model-backed number.** Every other
+  intervention's probability comes from the simulator's oracle, which is
+  meant to represent ground truth for evaluation/simulation purposes, not a
+  learned estimate. If the agent needs to explain *why* an action was chosen,
+  it should be clear with users/reviewers that `payment_link` /
+  `notification` / `escalate` probabilities are simulator-sourced, not from a
+  trained classifier.
+- **Guardrails currently short-circuit EV entirely.** When a guardrail fires,
+  `all_evaluated` still contains the true EV numbers for all five
+  interventions (useful for the agent to explain "the model preferred X but
+  policy required Y"), but `decision`/`expected_value` reflect the forced
+  action, not the argmax.
+- **`simulate_outcome` must not be called more than once per intervention per
+  decision context** outside of evaluation code. The agent should treat
+  probability-only inspection (as `calculate_expected_value` does) as the
+  correct pattern if it ever needs to reason about a non-retry intervention
+  directly; it should not call `simulate_outcome` speculatively to "see what
+  would happen" before committing to an action, since that consumes a random
+  draw against the deterministic per-`(payment_id, intervention)` seed.
+- **Do not import `data/recoverability.py`.** Same rule as Phase 2 — the
+  oracle stays an environment, never a feature or agent tool.
