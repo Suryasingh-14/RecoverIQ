@@ -20,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "data"))
 sys.path.insert(0, str(PROJECT_ROOT / "engine"))
 

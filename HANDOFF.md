@@ -507,3 +507,144 @@ API's `retry_delay`. Re-run `python agent/test_agent.py` with
   (already 8) and consider caching EV tool results per payment in production.
 - Still **do not import `data/recoverability.py`**. Still **do not** call
   `simulate_outcome` to "see what would happen" before committing.
+## Phase 5: Guardrail Engine
+
+Adds `guardrails/policy_engine.py` and `guardrails/config.py`, plus
+`tests/test_guardrails.py`. Updates `engine/decision_engine.py` to delegate
+to this engine instead of keeping its own hardcoded copy of the rules.
+
+### Decision API
+
+```python
+from guardrails.policy_engine import check_guardrails
+
+check_guardrails(
+    payment_row,
+    proposed_decision,          # what the EV argmax or the AI agent wants to run
+    guardrail_config=None,      # overrides merged onto guardrails.config.DEFAULT_GUARDRAIL_CONFIG
+    retry_attempts_so_far=0,    # Rule 3 input -- no persistent action log yet, caller tracks this
+    incentive_pct=0.0,          # Rule 4 input
+) -> dict
+# {proposed_decision, allowed, final_decision, violated_rules, guardrail_config_used}
+```
+
+The core idea carried over from the spec: the AI agent (Phase 4) or the EV
+argmax (Phase 3) *proposes* an action; `check_guardrails` has final say on
+whether it's allowed to execute, and can force a safer one. `decision_engine
+.decide_best_action()` now has no guardrail logic of its own -- it computes
+the EV argmax, passes the proposal to `check_guardrails`, and returns
+whatever `final_decision` comes back with.
+
+### The 5 rules and their priority order
+
+Evaluated independently; when more than one fires, the **most conservative**
+forced outcome wins (documented in code comments in `policy_engine.py`):
+
+1. **High amount → escalate** *(priority 2)* -- `amount > high_amount_threshold`
+   (default `50000`) forces `"escalate"`.
+2. **Repeated hard decline → stop** *(priority 1, strictest)* -- `failure_reason
+   == "hard_decline"` and `previous_failures >= hard_decline_repeat_failures`
+   (default `3`) forces `"stop"`. Wins over Rule 1 if both fire, since "no
+   action" is always the safer outcome than "escalate".
+3. **Unauthorized action** *(priority 3)* -- `proposed_decision` not one of
+   `retry | payment_link | notification | escalate | stop` is rejected and
+   falls back to `invalid_action_fallback` (default `"escalate"`).
+4. **Max retries** *(priority 4)* -- if `proposed_decision == "retry"` and
+   `retry_attempts_so_far >= max_retry_attempts` (default `2`), `"retry"` is
+   blocked and falls back to `max_retry_action` (default `"escalate"`).
+5. **Max incentive** *(lowest priority, no forced intervention change)* --
+   `incentive_pct > max_incentive_pct` (default `0.05`) is flagged as a
+   violation (so `allowed=False`) but does not change which intervention
+   runs -- it only means the incentive itself must be capped before
+   execution.
+
+Rule 3 and Rule 4 can never both fire on the same call: Rule 4 only applies
+once `proposed_decision == "retry"`, which is by definition a valid
+intervention, so Rule 3 (invalid action) can't also be true for it.
+
+All thresholds live in `guardrails/config.py`'s `DEFAULT_GUARDRAIL_CONFIG`
+so they're not magic numbers -- easy to tweak for a demo via the
+`guardrail_config` override dict.
+
+### Tests
+
+`tests/test_guardrails.py` has 12 cases covering: the pass-through case,
+each rule firing individually, the Rule 1 + Rule 2 priority conflict (stop
+wins), the amount-exactly-at-threshold and previous-failures-exactly-at-
+threshold boundaries, an invalid proposed action, and a `guardrail_config`
+override actually changing behavior.
+
+Run with:
+
+```bash
+pytest tests/test_guardrails.py -v
+```
+
+**Note on how these were verified in this environment:** the sandbox this
+Phase 5 work was done in has no network access, so `pytest` could not be
+installed to produce a real `pytest ... -v` CLI summary line. Each of the
+12 test functions was instead imported and executed directly (equivalent
+assertions, same pass/fail semantics) against `guardrails/policy_engine.py`
+and the updated `engine/decision_engine.py`: **12 passed, 0 failed**.
+Please re-run the actual `pytest` command in the real repo environment to
+get the standard summary line for the record.
+
+**Caveat on `engine/expected_value.py`:** that file (and `models/`,
+`data/`, `agent/`) were not part of this handoff's upload, so a small local
+stand-in `expected_value.py` (same `VALID_INTERVENTIONS` list and
+`calculate_expected_value()` signature/return shape, toy probabilities) was
+used to exercise `decide_best_action()` end-to-end here -- mirroring how
+Phase 3 itself was verified against a "locally reconstructed stand-in"
+per the note above. Do not merge that stand-in file into the real repo;
+`engine/decision_engine.py`'s changes only touch its guardrail call, not
+its EV logic, so it should work unmodified against the real
+`expected_value.py`.
+
+### `engine/decision_engine.py` changes
+
+- Removed the old inline `_apply_guardrails` function and
+  `DEFAULT_GUARDRAIL_CONFIG` (that config now lives in
+  `guardrails/config.py`).
+- `decide_best_action()` still computes all five EV dicts via
+  `calculate_expected_value()` and still returns the same
+  `{payment_id, decision, expected_value, reason, all_evaluated}` shape.
+- Internally, it now takes the EV argmax as a *proposal* and calls
+  `guardrails.policy_engine.check_guardrails()` to get the real
+  `final_decision`. `reason` now distinguishes "highest expected value"
+  (nothing fired) from "overridden by guardrails: ..." (lists which rules
+  fired), so `all_evaluated` + `reason` together still let an agent explain
+  "the model preferred X but policy required Y" exactly as before.
+- Added two new optional keyword arguments, `retry_attempts_so_far=0` and
+  `incentive_pct=0.0`, so callers can opt into Rules 3 and 4; existing
+  callers that don't pass them get identical behavior to before (modulo the
+  two new rules simply never firing at their defaults).
+
+### Caveats for Phase 6 (Evaluation)
+
+- `evaluation/ml_strategy.py` should now be checked against the *new*
+  `decide_best_action()` signature -- it still works unmodified with
+  positional/keyword defaults, but if the evaluation loop wants to exercise
+  Rules 3/4 it needs to track `retry_attempts_so_far` per `payment_id`
+  itself (there's still no persistent action log) and pass an
+  `incentive_pct` if the strategy being evaluated uses one.
+- The seed-42 `naive_strategy` / `rule_based_strategy` / `ml_strategy`
+  comparison table is still pending real numbers (per the Phase 3 section
+  above) -- that hasn't changed here.
+- Consider adding a guardrail-specific evaluation metric: how often the EV
+  argmax's proposal gets overridden, and by which rule, across the full
+  15,000-row dataset -- this feeds directly into the Phase 7 caveat below.
+
+### Caveats for Phase 7 (Dashboard)
+
+- Per the original spec's guardrail examples, the dashboard should surface
+  a **guardrail violations count** as one of its KPIs -- e.g. total
+  decisions where `allowed=False`, broken down by which of the 5 rules
+  fired (`violated_rules` already gives rule names/descriptions to group
+  by).
+- Since Rule 4 (max incentive) doesn't change `final_decision`, the
+  dashboard should treat it as a distinct "flagged, not blocked" category
+  rather than lumping it in with the intervention-overriding rules (1, 2,
+  3, and the invalid-action fallback).
+- If/when a persistent action log exists, `retry_attempts_so_far` should
+  come from real history instead of being passed in per-call -- the
+  dashboard is a natural place to expose that log.
