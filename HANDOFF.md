@@ -410,3 +410,100 @@ in the table above are pending a run against the real files.
   draw against the deterministic per-`(payment_id, intervention)` seed.
 - **Do not import `data/recoverability.py`.** Same rule as Phase 2 — the
   oracle stays an environment, never a feature or agent tool.
+
+---
+
+## Phase 4: AI Agent
+
+Adds `agent/tools.py`, `agent/prompts.py`, `agent/agent.py`, and
+`agent/test_agent.py`. Does not modify any `engine/` or `models/` file.
+Does not reimplement expected value or `decide_best_action()` logic.
+
+### Decision API
+
+```python
+from agent.agent import run_agent_decision
+
+run_agent_decision(payment_id, api_key=None) -> dict
+# {payment_id, decision, delay_hours, reason, expected_value}
+```
+
+- `decision` is one of `retry` | `payment_link` | `notification` | `escalate` | `stop`.
+- `delay_hours` is a number or `null` (hours to wait before the chosen action).
+- The agent **does not execute** the action; it only returns the JSON decision.
+- Tool-calling loop is capped at **8** iterations.
+
+### API key
+
+Environment variable: **`GEMINI_API_KEY`**
+
+Loaded from `.env` via `python-dotenv` (`load_dotenv()` in `agent/agent.py`).
+If `api_key` is `None`, the key is read with `os.environ.get("GEMINI_API_KEY")`.
+The key is never hardcoded. `.env` is gitignored. Placeholder file:
+`.env.example` (`GEMINI_API_KEY=your-key-here`).
+
+Model: **`gemini-3.6-flash`**. `gemini-2.5-flash` (originally specified for the
+free tier) returns 404 for new API keys ("no longer available to new users");
+the Google API recommends `gemini-3.6-flash` instead. Optional override:
+`GEMINI_MODEL`.
+
+```bash
+pip install google-generativeai python-dotenv
+python agent/test_agent.py
+```
+
+### Tools
+
+Registered from `agent/tools.py` (JSON-serializable dicts; no pandas objects):
+
+| Tool | Wraps / does |
+|------|----------------|
+| `get_payment(payment_id)` | Lookup row in `data/sample_data/payments.csv` |
+| `get_customer_history(customer_id)` | All CSV events for that customer |
+| `get_failure_details(payment_id)` | Failure-focused subset of the payment row |
+| `calculate_recovery_probability(payment_id, intervention)` | `calculate_expected_value()` → `probability_used` |
+| `calculate_expected_value_tool(payment_id, intervention)` | `engine.expected_value.calculate_expected_value` |
+| `retry_payment` / `generate_payment_link` / `send_notification` / `escalate_to_human` / `stop_recovery` | Stubs that **do not execute** (`executed: false`) |
+
+The agent is instructed to always call `get_payment`, `get_customer_history`,
+and `get_failure_details` first, then `calculate_expected_value_tool` for each
+candidate intervention, and never to guess probabilities or call action tools.
+
+### Sample test output
+
+`agent/test_agent.py` cases and **Phase 3** `decide_best_action()`:
+
+| payment_id | failure | Phase 3 decision | Phase 3 EV |
+|------------|---------|------------------|------------|
+| `PAY-0000001` | `temporary_bank_failure` | `retry` | 258.5182 |
+| `PAY-0000003` | `insufficient_funds` | `notification` | 129.4356 |
+| `PAY-0000005` | `hard_decline` (prev_failures=4) | `stop` (guardrail) | 0.0 |
+| `PAY-0000013` | `card_expired` | `payment_link` | 5.4788 |
+| `PAY-0000016` | `temporary_bank_failure` (larger amount) | `retry` | 3636.6932 |
+
+Live `run_agent_decision()` uses Gemini with the same `test_agent.py` harness.
+
+Sample live run (`PAY-0000001`): agent chose `retry`, `expected_value`
+258.5182, **MATCH** vs Phase 3. Remaining cases in the same minute can 429
+on the free-tier 5 requests/minute cap; the agent retries once after the
+API's `retry_delay`. Re-run `python agent/test_agent.py` with
+`GEMINI_API_KEY` set.
+
+### Caveats for Phase 5
+
+- **Guardrails are still hardcoded in Phase 3 only.** The agent scores EV via
+  tools and is not wired to `_apply_guardrails`. On cases like `PAY-0000005`
+  it may pick a high-EV action while `decide_best_action()` forces `stop`.
+  Phase 5 should either expose guardrails as a tool or apply them after the
+  agent JSON, before any execution.
+- **Do not execute recovery from the agent.** Action tools are stubs. A
+  dashboard or executor should take the decision JSON and call a real
+  execution layer (still without extra speculative `simulate_outcome` draws).
+- **`delay_hours` is agent-authored**, not produced by the EV engine. Phase 5
+  should decide whether to honor, clamp, or ignore it.
+- **Non-retry probabilities remain simulator-oracle numbers.** UI copy should
+  not present them as a trained multi-action model.
+- **API key and spend.** Require `GEMINI_API_KEY` in env; cap tool loops
+  (already 8) and consider caching EV tool results per payment in production.
+- Still **do not import `data/recoverability.py`**. Still **do not** call
+  `simulate_outcome` to "see what would happen" before committing.
