@@ -1,0 +1,52 @@
+{
+  "multi_split_avg_incremental_revenue": 189972.90900000013,
+  "multi_split_avg_incremental_rate_pp": 2.009333333333332,
+  "progression": {
+    "naive_strategy": {
+      "n": 15000,
+      "n_recovered": 6364,
+      "recovery_rate_pct": 42.42666666666667,
+      "total_revenue_recovered": 6030389.050000001,
+      "decision_mix": {
+        "retry": 15000
+      }
+    },
+    "rule_based_strategy": {
+      "n": 15000,
+      "n_recovered": 7510,
+      "recovery_rate_pct": 50.06666666666667,
+      "total_revenue_recovered": 7070455.8100000005,
+      "decision_mix": {
+        "retry": 7361,
+        "notification": 4238,
+        "stop": 3401
+      }
+    },
+    "ml_strategy": {
+      "n": 15000,
+      "n_recovered": 7777,
+      "recovery_rate_pct": 51.846666666666664,
+      "total_revenue_recovered": 7302609.68,
+      "decision_mix": {
+        "retry": 7603,
+        "notification": 4303,
+        "payment_link": 2171,
+        "escalate": 304,
+        "stop": 619
+      }
+    },
+    "RecoverIQ": {
+      "n": 15000,
+      "n_recovered": 7757,
+      "recovery_rate_pct": 51.71333333333333,
+      "total_revenue_recovered": 7289028.51,
+      "decision_mix": {
+        "retry": 7369,
+        "notification": 4244,
+        "stop": 1479,
+        "payment_link": 1729,
+        "escalate": 179
+      }
+    }
+  }
+}
