@@ -785,7 +785,256 @@ def main() -> None:
     )
 
     # -------------------------------------------------------------------------
-    # 4. AI AGENT REASONING EXAMPLES
+    # 4. WHAT-IF SIMULATOR
+    # -------------------------------------------------------------------------
+    st.markdown("<div style='margin-top: 36px;'></div>", unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="section-header">
+            <span>🔮</span> What-If Scenario Simulator
+        </div>
+        <div class="section-caption">
+            Construct a hypothetical failed payment and see RecoverIQ's live decision engine reason through it in real time — no dataset lookup, pure model + business logic.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Initialize What-If session state defaults
+    if "whatif_amount" not in st.session_state:
+        st.session_state["whatif_amount"] = 1000.0
+    if "whatif_failure_reason" not in st.session_state:
+        st.session_state["whatif_failure_reason"] = "temporary_bank_failure"
+    if "whatif_payment_method" not in st.session_state:
+        st.session_state["whatif_payment_method"] = "card"
+    if "whatif_customer_age" not in st.session_state:
+        st.session_state["whatif_customer_age"] = 35
+    if "whatif_previous_successes" not in st.session_state:
+        st.session_state["whatif_previous_successes"] = 5
+    if "whatif_previous_failures" not in st.session_state:
+        st.session_state["whatif_previous_failures"] = 2
+    if "whatif_customer_value" not in st.session_state:
+        st.session_state["whatif_customer_value"] = 3000.0
+    if "whatif_subscription_age" not in st.session_state:
+        st.session_state["whatif_subscription_age"] = 8
+    if "whatif_days_since_last_payment" not in st.session_state:
+        st.session_state["whatif_days_since_last_payment"] = 14
+
+    st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: var(--text-color, inherit); opacity: 0.85; margin-bottom: 6px;'>PRESET WHAT-IF SCENARIOS:</div>", unsafe_allow_html=True)
+    whatif_preset_cols = st.columns(3)
+
+    def _apply_whatif_preset(amount: float, reason: str, method: str, age: int, successes: int, failures: int, value: float, sub_age: int, days: int) -> None:
+        st.session_state["whatif_amount"] = float(amount)
+        st.session_state["whatif_failure_reason"] = reason
+        st.session_state["whatif_payment_method"] = method
+        st.session_state["whatif_customer_age"] = int(age)
+        st.session_state["whatif_previous_successes"] = int(successes)
+        st.session_state["whatif_previous_failures"] = int(failures)
+        st.session_state["whatif_customer_value"] = float(value)
+        st.session_state["whatif_subscription_age"] = int(sub_age)
+        st.session_state["whatif_days_since_last_payment"] = int(days)
+
+    with whatif_preset_cols[0]:
+        st.button(
+            "High-Value Escalation Test\n(₹75k → Escalate Guardrail)",
+            on_click=_apply_whatif_preset,
+            args=(75000.0, "temporary_bank_failure", "card", 40, 8, 1, 12000.0, 12, 10),
+            width="stretch",
+        )
+    with whatif_preset_cols[1]:
+        st.button(
+            "Repeat Offender Test\n(Hard Decline × 5 → Stop Guardrail)",
+            on_click=_apply_whatif_preset,
+            args=(2500.0, "hard_decline", "card", 32, 1, 5, 800.0, 3, 30),
+            width="stretch",
+        )
+    with whatif_preset_cols[2]:
+        st.button(
+            "Ideal Recovery Case\n(UPI + 15 Wins → High EV Retry)",
+            on_click=_apply_whatif_preset,
+            args=(1200.0, "temporary_bank_failure", "upi", 28, 15, 0, 8500.0, 18, 5),
+            width="stretch",
+        )
+
+    # Form inputs & result layout
+    col_whatif_form, col_whatif_result = st.columns([1.1, 1.1])
+
+    with col_whatif_form:
+        st.markdown(
+            """
+            <div class="flow-card">
+                <div class="flow-card-header">
+                    <span class="flow-card-title">① Hypothetical Payment Configuration</span>
+                    <span class="badge badge-payment_link">CUSTOM SCENARIO</span>
+                </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        w_col1, w_col2 = st.columns(2)
+        with w_col1:
+            w_amount = st.number_input(
+                "Transaction Amount (₹):",
+                min_value=1.0,
+                max_value=200000.0,
+                step=500.0,
+                key="whatif_amount",
+            )
+        with w_col2:
+            failure_options = [
+                "temporary_bank_failure",
+                "network_error",
+                "insufficient_funds",
+                "card_expired",
+                "hard_decline",
+            ]
+            w_failure_reason = st.selectbox(
+                "Failure Reason:",
+                options=failure_options,
+                key="whatif_failure_reason",
+            )
+
+        w_col3, w_col4 = st.columns(2)
+        with w_col3:
+            method_options = ["card", "upi", "netbanking", "wallet"]
+            w_payment_method = st.selectbox(
+                "Payment Method:",
+                options=method_options,
+                key="whatif_payment_method",
+            )
+        with w_col4:
+            w_customer_value = st.number_input(
+                "Customer LTV (₹):",
+                min_value=0.0,
+                step=500.0,
+                key="whatif_customer_value",
+            )
+
+        w_customer_age = st.slider(
+            "Customer Age (Years):",
+            min_value=18,
+            max_value=70,
+            key="whatif_customer_age",
+        )
+
+        w_col5, w_col6 = st.columns(2)
+        with w_col5:
+            w_prev_successes = st.number_input(
+                "Previous Successes:",
+                min_value=0,
+                step=1,
+                key="whatif_previous_successes",
+            )
+        with w_col6:
+            w_prev_failures = st.number_input(
+                "Previous Failures:",
+                min_value=0,
+                step=1,
+                key="whatif_previous_failures",
+            )
+
+        w_col7, w_col8 = st.columns(2)
+        with w_col7:
+            w_sub_age = st.number_input(
+                "Subscription Tenure (Months):",
+                min_value=0,
+                step=1,
+                key="whatif_subscription_age",
+            )
+        with w_col8:
+            w_days_since = st.number_input(
+                "Days Since Last Attempt:",
+                min_value=0,
+                step=1,
+                key="whatif_days_since_last_payment",
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # Build hypothetical payment row dict
+    whatif_row = {
+        "payment_id": "WHATIF-CUSTOM",
+        "amount": float(w_amount),
+        "failure_reason": str(w_failure_reason),
+        "payment_method": str(w_payment_method),
+        "customer_age": int(w_customer_age),
+        "previous_successes": int(w_prev_successes),
+        "previous_failures": int(w_prev_failures),
+        "customer_value": float(w_customer_value),
+        "subscription_age": int(w_sub_age),
+        "days_since_last_payment": int(w_days_since),
+    }
+
+    # Run decision engine on hypothetical row
+    whatif_decision_result = decide_best_action(whatif_row)
+    whatif_decision = whatif_decision_result["decision"]
+    whatif_ev_val = whatif_decision_result["expected_value"]
+    whatif_reason = whatif_decision_result["reason"]
+    whatif_all_evaluated = whatif_decision_result["all_evaluated"]
+
+    # Realize deterministic simulation
+    whatif_sim = simulate_outcome(whatif_row, whatif_decision)
+    whatif_is_overridden = "overridden by guardrails" in whatif_reason
+
+    with col_whatif_result:
+        if whatif_is_overridden:
+            whatif_guardrail_badge = '<span class="badge badge-guardrail-fail">🛡️ Overridden by Guardrails</span>'
+        else:
+            whatif_guardrail_badge = '<span class="badge badge-guardrail-pass">✓ Guardrails Approved</span>'
+
+        st.markdown(
+            f"""
+            <div class="flow-card" style="border-left: 4px solid {INTERVENTION_COLORS.get(whatif_decision, '#4f46e5')};">
+                <div class="flow-card-header">
+                    <span class="flow-card-title">② Autonomous Decision Output</span>
+                    {whatif_guardrail_badge}
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                    <span class="badge badge-{whatif_decision}" style="font-size: 1.1rem; padding: 5px 14px;">{whatif_decision.replace('_', ' ').upper()}</span>
+                    <span style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">EV: ₹{whatif_ev_val:,.2f}</span>
+                </div>
+                <div style="font-size: 0.86rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.5;">
+                    <b style="color: #475569;">Decision Rationale:</b><br>{whatif_reason}
+                </div>
+                <div style="font-size: 0.84rem; color: #475569; display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                    <span>Environment Realization:</span>
+                    {'<span style="color: #059669; font-weight: 600;">✓ RECOVERED (₹' + f"{whatif_sim['recovered_amount']:,.2f}" + f" in {whatif_sim['recovery_time_hours']:.1f}h)</span>" if whatif_sim['payment_recovered'] else '<span style="color: #dc2626; font-weight: 600;">✗ NOT RECOVERED</span>'}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # Full All-Evaluated Interventions Matrix for What-If row
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 600; color: var(--text-color, inherit); margin-bottom: 8px;'>What-If Intervention Expected Value Matrix</div>", unsafe_allow_html=True)
+
+    whatif_matrix_rows = []
+    for ev_item in whatif_all_evaluated:
+        act = ev_item["intervention"]
+        p_val = ev_item["probability_used"]
+        cost_val = ev_item["cost"]
+        ev_calc = ev_item["expected_value"]
+        is_chosen = (act == whatif_decision)
+
+        whatif_matrix_rows.append({
+            "Status": "👉 CHOSEN" if is_chosen else "—",
+            "Intervention": act.replace("_", " ").title(),
+            "Recovery Probability": f"{p_val * 100:.2f}%",
+            "Execution Cost": f"₹{cost_val:,.2f}",
+            "Expected Value": f"₹{ev_calc:,.2f}",
+            "Formula Calculation": f"({p_val:.3f} × ₹{float(whatif_row['amount']):,.2f}) - ₹{cost_val:.0f}",
+        })
+
+    whatif_matrix_df = pd.DataFrame(whatif_matrix_rows)
+    st.dataframe(
+        whatif_matrix_df,
+        width="stretch",
+        hide_index=True,
+    )
+
+    # -------------------------------------------------------------------------
+    # 5. AI AGENT REASONING EXAMPLES
     # -------------------------------------------------------------------------
     st.markdown("<div style='margin-top: 36px;'></div>", unsafe_allow_html=True)
     st.markdown(

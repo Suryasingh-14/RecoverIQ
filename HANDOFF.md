@@ -818,6 +818,14 @@ To ensure the dashboard loads in under a second and delivers snappy interactivit
   - When a user selects a specific `payment_id` (e.g. `PAY-0000016`, `PAY-0000005`, `PAY-0000001`), `decide_best_action()` and `simulate_outcome()` run live for that **single transaction only**.
   - Displays live Expected Value calculations across all 5 candidate actions, rationale, and trust & safety guardrail audit statuses.
 
+- **What-If Scenario Simulator (`dashboard/app.py`):**
+  - Interactive simulator enabling users to construct custom hypothetical payment failure events (`WHATIF-CUSTOM`) by tweaking amount, failure reason, payment method, customer LTV, customer age, tenure, and prior successes/failures.
+  - Runs `engine.decision_engine.decide_best_action()` live to compute optimal action proposals, evaluate EV across all 5 candidate interventions, and enforce safety guardrails.
+  - Includes 3 preset edge-case scenarios:
+    1. *High-Value Escalation Test* (₹75,000 failure triggering Rule 1: `amount > 50000` $\to$ forced `escalate`).
+    2. *Repeat Offender Test* (`hard_decline` with 5 previous failures triggering Rule 2 $\to$ forced `stop`).
+    3. *Ideal Recovery Case* (UPI transaction with 15 prior successes and 0 failures $\to$ high EV `retry`).
+
 ### Known Limitations
 
 1. **Revenue at Risk Scope**: "Revenue at Risk" (₹14.12M) sums the amount across all failed payment events in `payments.csv`. In a production setup with active A/B splits, only the treatment cohort is actively processed by RecoverIQ.
