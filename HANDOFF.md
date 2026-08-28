@@ -648,3 +648,137 @@ its EV logic, so it should work unmodified against the real
 - If/when a persistent action log exists, `retry_attempts_so_far` should
   come from real history instead of being passed in per-call -- the
   dashboard is a natural place to expose that log.
+
+## Phase 6: Evaluation Engine
+
+Adds the experimentation/evaluation layer in `evaluation/experiments.py` and
+reusable metrics in `evaluation/metrics.py`. No files under `data/`, `models/`,
+`engine/`, `agent/`, or `guardrails/` were modified.
+
+### Function signatures
+
+```python
+run_control_experiment(
+    df=None,
+    control_strategy="rule_based",
+    treatment_strategy="ml_strategy",
+    split_ratio=0.5,
+    random_state=42,
+) -> dict
+
+calculate_recovery_rate(df_with_outcomes) -> float
+calculate_total_revenue(df_with_outcomes) -> float
+summarize_decision_mix(df_with_decisions) -> dict[str, int]
+```
+
+`run_control_experiment()` loads `data/sample_data/payments.csv` when `df` is
+omitted, shuffles reproducibly with `random_state=42`, and creates CONTROL and
+TREATMENT (RecoverIQ) groups according to `split_ratio`. CONTROL uses the
+existing `rule_based_strategy`. TREATMENT calls `decide_best_action()` and then
+calls `simulate_outcome()` exactly once for the selected intervention.
+
+Incremental revenue is normalized to a common comparison size before the
+comparison:
+
+```text
+incremental_revenue = treatment_revenue_scaled - control_revenue_scaled
+incremental_rate_pp = treatment_recovery_rate - control_recovery_rate
+```
+
+### Real Phase 6 run
+
+The real `data/sample_data/payments.csv` contains **15,000 events**. With the
+requested 50/50 split and `random_state=42`, the run produced 7,500 CONTROL and
+7,500 TREATMENT events.
+
+| Metric | CONTROL (rule-based) | TREATMENT (RecoverIQ) |
+|---|---:|---:|
+| Sample size | 7,500 | 7,500 |
+| Recovered events | 3,739 | 3,897 |
+| Recovery rate | 49.85% | 51.96% |
+| Revenue recovered | ₹3,626,469.68 | ₹3,554,409.53 |
+
+Because the groups are exactly equal-sized in this run, scaled revenue is the
+same as observed revenue. Therefore:
+
+- **Incremental revenue: -₹72,060.15**
+- **Incremental recovery rate: +2.11 percentage points**
+
+This result is important: RecoverIQ recovered more events and improved the
+recovery rate on this randomized split, but the recovered revenue was lower on
+this particular split because the treatment group contained a different mix of
+payment amounts. The experiment therefore reports both incremental rate and
+incremental revenue rather than relying on recovery rate alone.
+
+### Four-strategy progression
+
+All four strategies were evaluated against the same full 15,000-event
+`payments.csv` dataset using the deterministic simulator outcomes.
+
+| Strategy | Revenue recovered | Recovery rate | Recovered events |
+|---|---:|---:|---:|
+| `naive_strategy` | ₹6,030,389.05 | 42.43% | 6,364 |
+| `rule_based_strategy` | ₹7,070,455.81 | 50.07% | 7,510 |
+| `ml_strategy` (ML/EV proposal before guardrails) | ₹7,302,609.68 | 51.85% | 7,777 |
+| RecoverIQ (ML/EV + guardrails) | ₹7,289,028.51 | 51.71% | 7,757 |
+
+For the progression table, `ml_strategy` is represented by the highest-EV
+proposal contained in `decide_best_action()["all_evaluated"]`. This separates
+the ML/EV proposal from the final RecoverIQ decision, which applies the Phase 5
+guardrails. The existing `evaluation/ml_strategy.py` currently calls
+`decide_best_action()` directly, so it is guardrail-aware; Phase 6 deliberately
+uses its underlying decision-engine evaluation data to expose the requested
+ML-only progression without modifying that existing file.
+
+### Phase 6 verification
+
+- `evaluation/metrics.py` and `evaluation/experiments.py` compile successfully
+  with `python -m py_compile`.
+- `run_control_experiment(..., random_state=42)` was executed against the real
+  15,000-row `payments.csv`.
+- The real model artifact was loaded and used by the decision engine.
+- The simulator was used to realize outcomes only after a strategy selected an
+  intervention.
+- The environment emitted sklearn `InconsistentVersionWarning` messages
+  because the saved model was created with scikit-learn 1.9.0 while this
+  execution environment has 1.8.0. The run completed successfully; the model
+  should be regenerated or evaluated under the project's pinned/target
+  dependency version before production use.
+
+### Caveats for Phase 7 (Dashboard)
+
+- The dashboard should display **incremental revenue** as the headline KPI,
+  per the original spec's dashboard design. Raw treatment recovery should not
+  be presented as the primary measure of business impact.
+- Display incremental recovery rate in percentage points alongside incremental
+  revenue so users can see both event-level and revenue-level lift.
+- The dashboard can import `calculate_recovery_rate`,
+  `calculate_total_revenue`, and `summarize_decision_mix` directly from
+  `evaluation.metrics`.
+- Because one randomized split can have different payment-value mixes, the
+  dashboard should make the experiment's sample sizes and scaling method
+  visible when showing incremental revenue.
+- A single split is not sufficient for a production causal claim. Phase 7 can
+  expose the seed/split metadata and, if the original spec permits, support
+  repeated seeded experiments or confidence intervals later.
+
+### Multi-split robustness extension
+
+Added the following reusable Phase 6 function:
+
+```text
+run_multiple_splits(n_seeds=10)
+```
+
+It runs `run_control_experiment()` once for each seed from `0` through
+`n_seeds - 1` and returns the individual experiment results plus:
+
+```text
+average_incremental_revenue
+average_incremental_rate_pp
+```
+
+This provides a simple multi-seed robustness check instead of relying on a
+single randomized control/treatment split. The returned `runs` list preserves
+the complete result for every seed so Phase 7 can display or analyze the
+individual splits if desired.
