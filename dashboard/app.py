@@ -33,21 +33,21 @@ from models.recovery_model import FEATURE_COLUMNS, load_recovery_model
 DATA_PATH = ROOT_DIR / "data" / "sample_data" / "payments.csv"
 CACHE_PATH = ROOT_DIR / "evaluation" / "dashboard_cache.json"
 
-# Unified brand and semantic color palette (Stripe / AI Fintech aesthetic)
-BRAND_PRIMARY = "#4f46e5"      # Indigo - Main brand accent
-BRAND_PRIMARY_DARK = "#3730a3" # Deep Indigo
-COLOR_SUCCESS = "#059669"      # Emerald - Recovery / Gains
-COLOR_WARNING = "#d97706"      # Amber - Guardrails / Alerts
-COLOR_DANGER = "#dc2626"       # Rose - Hard Decline / Failures
-COLOR_INFO = "#0284c7"         # Sky Blue - Info
-COLOR_NEUTRAL = "#64748b"      # Slate - Muted / Secondary
+# Unified brand and semantic color palette (Razorpay Fintech Aesthetic)
+BRAND_PRIMARY = "#3395FF"      # Razorpay Signature Blue
+BRAND_PRIMARY_DARK = "#2563EB" # Deep Royal Blue
+COLOR_SUCCESS = "#10B981"      # Emerald Green - Recovery / Gains
+COLOR_WARNING = "#F59E0B"      # Amber Orange - Guardrails / Alerts
+COLOR_DANGER = "#EF4444"       # Rose Red - Hard Decline / Failures
+COLOR_INFO = "#38BDF8"         # Sky Blue - Info
+COLOR_NEUTRAL = "#94A3B8"      # Slate - Muted / Secondary
 
 INTERVENTION_COLORS = {
-    "retry": "#059669",         # Emerald
-    "payment_link": "#2563eb",  # Blue
-    "notification": "#7c3aed",  # Purple
-    "escalate": "#d97706",      # Amber
-    "stop": "#64748b",          # Slate
+    "retry": "#10B981",         # Emerald Green
+    "payment_link": "#3395FF",  # Razorpay Blue
+    "notification": "#A855F7",  # Purple
+    "escalate": "#F59E0B",      # Amber
+    "stop": "#64748B",          # Slate Gray
 }
 
 FONT_FAMILY = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
@@ -113,72 +113,102 @@ def compute_sample_probabilities(df: pd.DataFrame, sample_size: int = 500) -> pd
 # -----------------------------------------------------------------------------
 def main() -> None:
     st.set_page_config(
-        page_title="RecoverIQ — AI Revenue Recovery Engine",
+        page_title="RecoverIQ — Razorpay AI Decision Engine",
         page_icon="⚡",
         layout="wide",
         initial_sidebar_state="expanded",
     )
 
-    # Custom CSS for polished, unified fintech aesthetic
+    # Custom CSS for Razorpay-inspired dark fintech aesthetic
     st.markdown(
         f"""
         <style>
         /* Base typography & page styling */
         html, body, [class*="css"] {{
             font-family: {FONT_FAMILY};
+            color: #F8FAFC;
+        }}
+
+        /* Global dark background enforcement */
+        .stApp {{
+            background-color: #0F172A;
+            color: #F8FAFC;
         }}
 
         /* Section Headings */
         .section-header {{
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--text-color, inherit);
-            margin-bottom: 2px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #F8FAFC;
+            margin-bottom: 3px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
+            letter-spacing: -0.01em;
         }}
         .section-caption {{
-            font-size: 0.85rem;
-            color: var(--text-color, #94a3b8);
-            opacity: 0.8;
-            margin-bottom: 16px;
+            font-size: 0.86rem;
+            color: #94A3B8;
+            margin-bottom: 18px;
+            line-height: 1.4;
         }}
 
-        /* Polished KPI Cards with Accent Top Border & Soft Shadow */
+        /* Top Hero Container */
+        .hero-container {{
+            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            border: 1px solid #334155;
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+        }}
+        .hero-accent-bar {{
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3395FF 0%, #00D2FF 50%, #10B981 100%);
+        }}
+
+        /* Polished KPI Cards with Razorpay Accent Borders */
         .kpi-card {{
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
+            background-color: #1E293B;
+            border: 1px solid #334155;
             border-radius: 12px;
             padding: 16px 14px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
-            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.25), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
             height: 100%;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
         }}
         .kpi-card:hover {{
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px -2px rgba(0, 0, 0, 0.35);
+            border-color: #475569;
         }}
-        .kpi-border-indigo {{ border-top: 3px solid #4f46e5; }}
-        .kpi-border-emerald {{ border-top: 3px solid #059669; }}
-        .kpi-border-amber {{ border-top: 3px solid #d97706; }}
-        .kpi-border-blue {{ border-top: 3px solid #2563eb; }}
-        .kpi-border-slate {{ border-top: 3px solid #64748b; }}
+        .kpi-border-blue {{ border-top: 3px solid #3395FF; }}
+        .kpi-border-emerald {{ border-top: 3px solid #10B981; }}
+        .kpi-border-amber {{ border-top: 3px solid #F59E0B; }}
+        .kpi-border-cyan {{ border-top: 3px solid #38BDF8; }}
+        .kpi-border-slate {{ border-top: 3px solid #64748B; }}
 
         .kpi-label {{
             font-size: 0.72rem;
-            color: #64748b;
+            color: #94A3B8;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.06em;
             margin-bottom: 6px;
         }}
         .kpi-value {{
-            font-size: 1.7rem;
+            font-size: 1.75rem;
             font-weight: 700;
-            color: #0f172a;
+            color: #F8FAFC;
             letter-spacing: -0.02em;
             line-height: 1.2;
             margin-bottom: 4px;
@@ -186,69 +216,198 @@ def main() -> None:
         .kpi-subtext {{
             font-size: 0.78rem;
             font-weight: 500;
-            color: #64748b;
+            color: #94A3B8;
         }}
         .kpi-subtext-success {{
-            color: #059669;
+            color: #10B981 !important;
             font-weight: 600;
         }}
         .kpi-subtext-warning {{
-            color: #d97706;
+            color: #F59E0B !important;
             font-weight: 600;
         }}
 
-        /* Subtle Badges */
+        /* Subtle Badges with alpha background and high-contrast text */
         .badge {{
             display: inline-flex;
             align-items: center;
-            padding: 3px 9px;
-            font-size: 0.78rem;
+            padding: 3px 10px;
+            font-size: 0.76rem;
             font-weight: 600;
             border-radius: 9999px;
-            letter-spacing: 0.02em;
+            letter-spacing: 0.03em;
         }}
-        .badge-retry {{ background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }}
-        .badge-payment_link {{ background-color: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }}
-        .badge-notification {{ background-color: #f5f3ff; color: #6d28d9; border: 1px solid #ddd6fe; }}
-        .badge-escalate {{ background-color: #fffbeb; color: #b45309; border: 1px solid #fde68a; }}
-        .badge-stop {{ background-color: #f8fafc; color: #475569; border: 1px solid #cbd5e1; }}
-        .badge-guardrail-pass {{ background-color: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }}
-        .badge-guardrail-fail {{ background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }}
+        .badge-hero {{
+            background: linear-gradient(135deg, rgba(51, 149, 255, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
+            color: #60A5FA;
+            border: 1px solid rgba(51, 149, 255, 0.4);
+        }}
+        .badge-retry {{
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }}
+        .badge-payment_link {{
+            background-color: rgba(51, 149, 255, 0.15);
+            color: #60A5FA;
+            border: 1px solid rgba(51, 149, 255, 0.35);
+        }}
+        .badge-notification {{
+            background-color: rgba(168, 85, 247, 0.15);
+            color: #C084FC;
+            border: 1px solid rgba(168, 85, 247, 0.35);
+        }}
+        .badge-escalate {{
+            background-color: rgba(245, 158, 11, 0.15);
+            color: #FBBF24;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }}
+        .badge-stop {{
+            background-color: rgba(100, 116, 139, 0.2);
+            color: #CBD5E1;
+            border: 1px solid rgba(100, 116, 139, 0.4);
+        }}
+        .badge-guardrail-pass {{
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #34D399;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+        }}
+        .badge-guardrail-fail {{
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #F87171;
+            border: 1px solid rgba(239, 68, 68, 0.35);
+        }}
 
         /* Transaction Container Pair */
         .flow-card {{
-            background-color: #ffffff;
-            border: 1px solid #e2e8f0;
+            background-color: #1E293B;
+            border: 1px solid #334155;
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
             height: 100%;
         }}
         .flow-card-header {{
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #f1f5f9;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #334155;
         }}
         .flow-card-title {{
             font-size: 0.78rem;
             font-weight: 700;
-            color: #64748b;
+            color: #94A3B8;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }}
+
+        /* High-Contrast Table Styling inside Flow Cards with Uniform Row Spacing */
+        .transaction-table {{
+            width: 100%;
+            font-size: 0.86rem;
+            color: #F1F5F9;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }}
+        .transaction-table tr {{
+            border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+            height: 38px;
+        }}
+        .transaction-table tr:last-child {{
+            border-bottom: none;
+        }}
+        .transaction-table td {{
+            vertical-align: middle;
+            padding: 9px 0;
+            box-sizing: border-box;
+            line-height: 1.3;
+        }}
+        .transaction-table td.label-cell {{
+            color: #94A3B8;
+            font-weight: 500;
+            width: 52%;
+            text-align: left;
+            padding-right: 12px;
+            padding-left: 0;
+        }}
+        .transaction-table td.value-cell {{
+            color: #F8FAFC;
+            font-weight: 600;
+            width: 48%;
+            text-align: right;
+            padding-left: 12px;
+            padding-right: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        /* Decision Rationale Box */
+        .rationale-box {{
+            font-size: 0.86rem;
+            color: #E2E8F0;
+            background-color: #0F172A;
+            border: 1px solid #334155;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            line-height: 1.55;
+        }}
+        .rationale-box b {{
+            color: #38BDF8;
+            font-weight: 600;
         }}
 
         /* Sidebar Styling */
         .sidebar-section-title {{
             font-size: 0.8rem;
             font-weight: 700;
-            color: var(--text-color, inherit);
+            color: #94A3B8;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-top: 14px;
+            letter-spacing: 0.06em;
+            margin-top: 16px;
             margin-bottom: 8px;
+        }}
+        .sidebar-box {{
+            background-color: #1E293B;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.84rem;
+            color: #E2E8F0;
+            line-height: 1.55;
+        }}
+        .sidebar-rules-box {{
+            font-size: 0.84rem;
+            color: #E2E8F0;
+            line-height: 1.8;
+        }}
+        .sidebar-rules-box code {{
+            background-color: #0F172A;
+            color: #38BDF8;
+            border: 1px solid #334155;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-family: monospace;
+        }}
+
+        /* Button hover improvements */
+        .stButton > button {{
+            background-color: #1E293B;
+            color: #E2E8F0;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }}
+        .stButton > button:hover {{
+            background-color: #2563EB;
+            color: #FFFFFF;
+            border-color: #3395FF;
+            box-shadow: 0 0 12px rgba(51, 149, 255, 0.3);
         }}
         </style>
         """,
@@ -266,12 +425,12 @@ def main() -> None:
     with st.sidebar:
         st.markdown(
             """
-            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 2px;">
-                <span style="font-size: 1.5rem;">⚡</span>
-                <span style="font-size: 1.35rem; font-weight: 700; color: var(--text-color, inherit);">RecoverIQ</span>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                <span style="font-size: 1.6rem; line-height: 1;">⚡</span>
+                <span style="font-size: 1.45rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.02em;">Recover<span style="color: #3395FF;">IQ</span></span>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-color, #94a3b8); opacity: 0.8; margin-bottom: 16px;">
-                AI Revenue Recovery Decision Engine
+            <div style="font-size: 0.78rem; color: #94A3B8; font-weight: 500; margin-bottom: 18px; letter-spacing: 0.02em;">
+                Razorpay AI Decisioning Suite
             </div>
             """,
             unsafe_allow_html=True,
@@ -280,7 +439,7 @@ def main() -> None:
         st.markdown('<div class="sidebar-section-title">About RecoverIQ</div>', unsafe_allow_html=True)
         st.markdown(
             """
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.84rem; color: #334155; line-height: 1.5;">
+            <div class="sidebar-box">
                 RecoverIQ dynamically evaluates Expected Value across 5 recovery actions (retry, payment link, notification, escalation, stop) while enforcing strict safety guardrails. Rather than an uncalibrated retry bot, it maximizes net recovery.
             </div>
             """,
@@ -292,7 +451,7 @@ def main() -> None:
         with st.expander("🛡️ Active Safety Rules", expanded=False):
             st.markdown(
                 f"""
-                <div style="font-size: 0.82rem; color: #334155; line-height: 1.6;">
+                <div class="sidebar-rules-box">
                 1. <b>High Amount</b>: > ₹{DEFAULT_GUARDRAIL_CONFIG['high_amount_threshold']:,} &rarr; <code>{DEFAULT_GUARDRAIL_CONFIG['high_amount_action']}</code><br>
                 2. <b>Repeated Decline</b>: <code>hard_decline</code> &ge; {DEFAULT_GUARDRAIL_CONFIG['hard_decline_repeat_failures']} failures &rarr; <code>{DEFAULT_GUARDRAIL_CONFIG['hard_decline_repeat_action']}</code><br>
                 3. <b>Max Retries</b>: &ge; {DEFAULT_GUARDRAIL_CONFIG['max_retry_attempts']} retries &rarr; <code>{DEFAULT_GUARDRAIL_CONFIG['max_retry_action']}</code><br>
@@ -307,31 +466,38 @@ def main() -> None:
         st.markdown('<div class="sidebar-section-title">System Information</div>', unsafe_allow_html=True)
         st.markdown(
             f"""
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; font-size: 0.8rem; color: #475569; line-height: 1.7;">
-                <div>📁 <b>Dataset:</b> {len(df):,} failed events</div>
-                <div>🧠 <b>ML Model:</b> Logistic Regression (AUC 0.893)</div>
-                <div>⚡ <b>Decisioning:</b> EV Argmax + Safety Layer</div>
-                <div>🏷️ <b>Version:</b> Phase 7 Production Build</div>
+            <div class="sidebar-box" style="font-size: 0.8rem; line-height: 1.75;">
+                <div>📁 <b style="color: #94A3B8;">Dataset:</b> <span style="color: #F8FAFC; font-weight: 600;">{len(df):,} failed events</span></div>
+                <div>🧠 <b style="color: #94A3B8;">ML Model:</b> <span style="color: #F8FAFC; font-weight: 600;">Logistic Regression (AUC 0.893)</span></div>
+                <div>⚡ <b style="color: #94A3B8;">Decisioning:</b> <span style="color: #F8FAFC; font-weight: 600;">EV Argmax + Safety Layer</span></div>
+                <div>🏷️ <b style="color: #94A3B8;">Version:</b> <span style="color: #3395FF; font-weight: 600;">Phase 7 Razorpay Build</span></div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
     # -------------------------------------------------------------------------
-    # Header Title
+    # Header Title / Hero Section (Razorpay Aesthetic)
     # -------------------------------------------------------------------------
     st.markdown(
         """
-        <div style="margin-bottom: 24px;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-                <h1 style="font-size: 1.85rem; font-weight: 700; color: var(--text-color, inherit); margin: 0; letter-spacing: -0.02em;">
-                    RecoverIQ Revenue Recovery Engine
-                </h1>
-                <span class="badge badge-retry" style="font-size: 0.72rem;">ACTIVE ENGINE</span>
+        <div class="hero-container">
+            <div class="hero-accent-bar"></div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+                        <span style="font-size: 1.8rem; line-height: 1;">⚡</span>
+                        <h1 style="font-size: 2.1rem; font-weight: 800; color: #FFFFFF; margin: 0; letter-spacing: -0.03em; display: inline-block;">
+                            Recover<span style="color: #3395FF;">IQ</span>
+                        </h1>
+                        <span class="badge badge-hero" style="font-size: 0.74rem;">RAZORPAY AI DECISION ENGINE</span>
+                        <span class="badge badge-retry" style="font-size: 0.72rem;">PRODUCTION READY</span>
+                    </div>
+                    <p style="font-size: 0.92rem; color: #94A3B8; margin: 0; line-height: 1.4;">
+                        Autonomous failed payment recovery decisioning, expected value optimization, and experimentation benchmarks for modern fintech infrastructure.
+                    </p>
+                </div>
             </div>
-            <p style="font-size: 0.92rem; color: var(--text-color, #94a3b8); opacity: 0.85; margin-top: 4px; margin-bottom: 0;">
-                Autonomous payment recovery decisioning, expected value optimization, and experimentation benchmarks.
-            </p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -366,9 +532,9 @@ def main() -> None:
     with kpi_col2:
         st.markdown(
             f"""
-            <div class="kpi-card kpi-border-indigo">
+            <div class="kpi-card kpi-border-blue">
                 <div class="kpi-label">Revenue Recovered</div>
-                <div class="kpi-value" style="color: #4f46e5;">₹{rev_recovered:,.0f}</div>
+                <div class="kpi-value" style="color: #3395FF;">₹{rev_recovered:,.0f}</div>
                 <div class="kpi-subtext">{recovery_rate:.2f}% of Exposure</div>
             </div>
             """,
@@ -380,7 +546,7 @@ def main() -> None:
             f"""
             <div class="kpi-card kpi-border-emerald">
                 <div class="kpi-label">Incremental Revenue</div>
-                <div class="kpi-value" style="color: #059669;">+₹{incremental_rev:,.0f}</div>
+                <div class="kpi-value" style="color: #10B981;">+₹{incremental_rev:,.0f}</div>
                 <div class="kpi-subtext kpi-subtext-success">+{incremental_rate_pp:.2f} pp vs Rule-Based</div>
             </div>
             """,
@@ -390,7 +556,7 @@ def main() -> None:
     with kpi_col4:
         st.markdown(
             f"""
-            <div class="kpi-card kpi-border-blue">
+            <div class="kpi-card kpi-border-cyan">
                 <div class="kpi-label">Recovery Rate</div>
                 <div class="kpi-value">{recovery_rate:.2f}%</div>
                 <div class="kpi-subtext">{rev_iq['n_recovered']:,} Successful Events</div>
@@ -416,7 +582,7 @@ def main() -> None:
             f"""
             <div class="kpi-card kpi-border-amber">
                 <div class="kpi-label">Guardrail Overrides</div>
-                <div class="kpi-value" style="color: #d97706;">{guardrail_violations:,}</div>
+                <div class="kpi-value" style="color: #F59E0B;">{guardrail_violations:,}</div>
                 <div class="kpi-subtext kpi-subtext-warning">{guardrail_stats['violation_pct']:.1f}% Forced Safe</div>
             </div>
             """,
@@ -447,7 +613,7 @@ def main() -> None:
 
         with col_strat:
             # 4-Strategy progression comparison
-            # Visual hierarchy: Muted grays for baselines, saturated brand indigo for RecoverIQ
+            # Visual hierarchy: Muted grays for baselines, saturated brand Razorpay Blue for RecoverIQ
             progression = cache["progression"]
             strat_names = {
                 "naive_strategy": "Naive (Always Retry)",
@@ -462,10 +628,10 @@ def main() -> None:
                     "Recovery Rate (%)": v["recovery_rate_pct"],
                     "Recovered Events": v["n_recovered"],
                     "BarColor": (
-                        "#4f46e5" if k == "RecoverIQ"          # Brand Indigo (Emphasized)
-                        else "#818cf8" if k == "ml_strategy"   # Soft Indigo/Purple
-                        else "#94a3b8" if k == "rule_based_strategy" # Mid Slate Gray
-                        else "#cbd5e1"                         # Light Slate Gray (Muted Baseline)
+                        "#3395FF" if k == "RecoverIQ"          # Razorpay Signature Blue (Emphasized)
+                        else "#60A5FA" if k == "ml_strategy"   # Light Blue Accent
+                        else "#64748B" if k == "rule_based_strategy" # Mid Slate Gray
+                        else "#334155"                         # Dark Slate Gray (Muted Baseline)
                     ),
                 }
                 for k, v in progression.items()
@@ -478,30 +644,31 @@ def main() -> None:
                     y=strat_df["Revenue Recovered (₹)"],
                     marker=dict(
                         color=strat_df["BarColor"],
-                        line=dict(color="#0f172a", width=0.5),
+                        line=dict(color="rgba(255, 255, 255, 0.1)", width=1),
                     ),
                     text=[
                         f"₹{val:,.0f} ({rate:.1f}%)"
                         for val, rate in zip(strat_df["Revenue Recovered (₹)"], strat_df["Recovery Rate (%)"])
                     ],
                     textposition="auto",
-                    textfont=dict(family=FONT_FAMILY, size=11),
+                    textfont=dict(family=FONT_FAMILY, size=11, color="#F8FAFC"),
                     hovertemplate="<b>%{x}</b><br>Revenue Recovered: ₹%{y:,.2f}<extra></extra>",
                 )
             )
             fig_strat.update_layout(
                 title=dict(
                     text="<b>Strategy Progression: Total Revenue Recovered</b>",
-                    font=dict(family=FONT_FAMILY, size=14),
+                    font=dict(family=FONT_FAMILY, size=14, color="#F8FAFC"),
                 ),
                 yaxis=dict(
-                    title=dict(text="Total Recovered (₹)", font=dict(family=FONT_FAMILY, size=12)),
-                    gridcolor="rgba(150, 150, 150, 0.15)",
+                    title=dict(text="Total Recovered (₹)", font=dict(family=FONT_FAMILY, size=12, color="#94A3B8")),
+                    gridcolor="rgba(255, 255, 255, 0.08)",
                     zeroline=False,
+                    tickfont=dict(family=FONT_FAMILY, size=11, color="#94A3B8"),
                 ),
                 xaxis=dict(
                     title="",
-                    tickfont=dict(family=FONT_FAMILY, size=11),
+                    tickfont=dict(family=FONT_FAMILY, size=11, color="#F8FAFC"),
                 ),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -530,14 +697,14 @@ def main() -> None:
             fig_mix.update_traces(
                 textposition="inside",
                 textinfo="percent+label",
-                textfont=dict(family=FONT_FAMILY, size=11),
+                textfont=dict(family=FONT_FAMILY, size=11, color="#FFFFFF"),
                 hovertemplate="<b>%{label}</b><br>Events: %{value:,} (%{percent})<extra></extra>",
-                marker=dict(line=dict(color="#ffffff", width=2)),
+                marker=dict(line=dict(color="#1E293B", width=2)),
             )
             fig_mix.update_layout(
                 title=dict(
                     text="<b>RecoverIQ Intervention Allocation Mix</b>",
-                    font=dict(family=FONT_FAMILY, size=14),
+                    font=dict(family=FONT_FAMILY, size=14, color="#F8FAFC"),
                 ),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -549,7 +716,7 @@ def main() -> None:
                     y=-0.15,
                     xanchor="center",
                     x=0.5,
-                    font=dict(family=FONT_FAMILY, size=11),
+                    font=dict(family=FONT_FAMILY, size=11, color="#E2E8F0"),
                 ),
             )
             st.plotly_chart(fig_mix, width="stretch")
@@ -558,7 +725,7 @@ def main() -> None:
         col_fail, col_prob = st.columns([1, 1])
 
         with col_fail:
-            # Revenue at risk by failure reason (monochromatic clean indigo/slate)
+            # Revenue at risk by failure reason
             fail_df = (
                 df.groupby("failure_reason")
                 .agg(Total_Amount=("amount", "sum"), Count=("amount", "count"))
@@ -574,19 +741,20 @@ def main() -> None:
                 orientation="h",
                 title="<b>Revenue At Risk by Failure Reason</b>",
                 labels={"Total_Amount": "Total Exposure (₹)", "Reason_Clean": "Failure Reason"},
-                color_discrete_sequence=["#4f46e5"],
+                color_discrete_sequence=["#3395FF"],
                 text=fail_df["Total_Amount"].apply(lambda x: f"₹{x:,.0f}"),
             )
             fig_fail.update_layout(
                 title=dict(
                     text="<b>Revenue At Risk by Failure Reason</b>",
-                    font=dict(family=FONT_FAMILY, size=14),
+                    font=dict(family=FONT_FAMILY, size=14, color="#F8FAFC"),
                 ),
                 xaxis=dict(
-                    title=dict(text="Total Exposure (₹)", font=dict(family=FONT_FAMILY, size=12)),
-                    gridcolor="rgba(150, 150, 150, 0.15)",
+                    title=dict(text="Total Exposure (₹)", font=dict(family=FONT_FAMILY, size=12, color="#94A3B8")),
+                    gridcolor="rgba(255, 255, 255, 0.08)",
+                    tickfont=dict(family=FONT_FAMILY, size=11, color="#94A3B8"),
                 ),
-                yaxis=dict(title="", tickfont=dict(family=FONT_FAMILY, size=11)),
+                yaxis=dict(title="", tickfont=dict(family=FONT_FAMILY, size=11, color="#F8FAFC")),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
                 height=370,
@@ -594,7 +762,7 @@ def main() -> None:
             )
             fig_fail.update_traces(
                 textposition="outside",
-                textfont=dict(family=FONT_FAMILY, size=11),
+                textfont=dict(family=FONT_FAMILY, size=11, color="#F8FAFC"),
             )
             st.plotly_chart(fig_fail, width="stretch")
 
@@ -607,21 +775,23 @@ def main() -> None:
                 nbins=25,
                 title="<b>ML Recovery Probability Distribution (500-Sample)</b>",
                 labels={"recovery_probability": "Predicted Recovery Probability"},
-                color_discrete_sequence=["#4f46e5"],
+                color_discrete_sequence=["#3395FF"],
                 opacity=0.85,
             )
             fig_hist.update_layout(
                 title=dict(
                     text="<b>ML Recovery Probability Distribution (500-Sample)</b>",
-                    font=dict(family=FONT_FAMILY, size=14),
+                    font=dict(family=FONT_FAMILY, size=14, color="#F8FAFC"),
                 ),
                 yaxis=dict(
-                    title=dict(text="Payment Count", font=dict(family=FONT_FAMILY, size=12)),
-                    gridcolor="rgba(150, 150, 150, 0.15)",
+                    title=dict(text="Payment Count", font=dict(family=FONT_FAMILY, size=12, color="#94A3B8")),
+                    gridcolor="rgba(255, 255, 255, 0.08)",
+                    tickfont=dict(family=FONT_FAMILY, size=11, color="#94A3B8"),
                 ),
                 xaxis=dict(
-                    title=dict(text="P(Recovery | Features, Retry)", font=dict(family=FONT_FAMILY, size=12)),
-                    gridcolor="rgba(150, 150, 150, 0.15)",
+                    title=dict(text="P(Recovery | Features, Retry)", font=dict(family=FONT_FAMILY, size=12, color="#94A3B8")),
+                    gridcolor="rgba(255, 255, 255, 0.08)",
+                    tickfont=dict(family=FONT_FAMILY, size=11, color="#94A3B8"),
                 ),
                 plot_bgcolor="rgba(0,0,0,0)",
                 paper_bgcolor="rgba(0,0,0,0)",
@@ -651,7 +821,7 @@ def main() -> None:
         st.session_state["payment_select"] = "PAY-0000016"
 
     # Preset Quick Select Buttons for demo showcase
-    st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: var(--text-color, inherit); opacity: 0.85; margin-bottom: 6px;'>PRESET DEMO TRANSACTIONS:</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: #94A3B8; margin-bottom: 6px; letter-spacing: 0.04em;'>PRESET DEMO TRANSACTIONS:</div>", unsafe_allow_html=True)
     preset_cols = st.columns(5)
 
     def _set_payment(pid: str) -> None:
@@ -706,20 +876,20 @@ def main() -> None:
                     <span class="flow-card-title">① Transaction Input</span>
                     <span class="badge badge-{decision}">{selected_row['payment_method'].upper()}</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
-                    <span style="font-size: 1.1rem; font-weight: 700; color: #0f172a;">{selected_row['payment_id']}</span>
-                    <span style="font-size: 1.7rem; font-weight: 700; color: #0f172a;">₹{float(selected_row['amount']):,.2f}</span>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+                    <span style="font-size: 1.15rem; font-weight: 700; color: #F8FAFC;">{selected_row['payment_id']}</span>
+                    <span style="font-size: 1.75rem; font-weight: 700; color: #F8FAFC;">₹{float(selected_row['amount']):,.2f}</span>
                 </div>
-                <div style="border-top: 1px solid #f1f5f9; padding-top: 10px;">
-                    <table style="width: 100%; font-size: 0.86rem; color: #334155; line-height: 1.8;">
-                        <tr><td style="color: #64748b;">Customer ID:</td><td><b>{selected_row['customer_id']}</b></td></tr>
-                        <tr><td style="color: #64748b;">Failure Reason:</td><td><span style="color: #dc2626; font-weight: 600;">{selected_row['failure_reason']}</span></td></tr>
-                        <tr><td style="color: #64748b;">Customer LTV:</td><td>₹{float(selected_row['customer_value']):,.2f}</td></tr>
-                        <tr><td style="color: #64748b;">Customer Age:</td><td>{selected_row['customer_age']} yrs</td></tr>
-                        <tr><td style="color: #64748b;">Historical Successes:</td><td><span style="color: #059669; font-weight: 600;">{selected_row['previous_successes']}</span></td></tr>
-                        <tr><td style="color: #64748b;">Historical Failures:</td><td><span style="color: #dc2626; font-weight: 600;">{selected_row['previous_failures']}</span></td></tr>
-                        <tr><td style="color: #64748b;">Subscription Tenure:</td><td>{selected_row['subscription_age']} months</td></tr>
-                        <tr><td style="color: #64748b;">Days Since Last Attempt:</td><td>{selected_row['days_since_last_payment']} days</td></tr>
+                <div style="border-top: 1px solid rgba(51, 65, 85, 0.6); margin-top: 10px;">
+                    <table class="transaction-table">
+                        <tr><td class="label-cell">Customer ID:</td><td class="value-cell">{selected_row['customer_id']}</td></tr>
+                        <tr><td class="label-cell">Failure Reason:</td><td class="value-cell"><span style="color: #EF4444; font-weight: 700;">{selected_row['failure_reason']}</span></td></tr>
+                        <tr><td class="label-cell">Customer LTV:</td><td class="value-cell">₹{float(selected_row['customer_value']):,.2f}</td></tr>
+                        <tr><td class="label-cell">Customer Age:</td><td class="value-cell">{selected_row['customer_age']} yrs</td></tr>
+                        <tr><td class="label-cell">Historical Successes:</td><td class="value-cell"><span style="color: #10B981; font-weight: 700;">{selected_row['previous_successes']}</span></td></tr>
+                        <tr><td class="label-cell">Historical Failures:</td><td class="value-cell"><span style="color: #EF4444; font-weight: 700;">{selected_row['previous_failures']}</span></td></tr>
+                        <tr><td class="label-cell">Subscription Tenure:</td><td class="value-cell">{selected_row['subscription_age']} months</td></tr>
+                        <tr><td class="label-cell">Days Since Last Attempt:</td><td class="value-cell">{selected_row['days_since_last_payment']} days</td></tr>
                     </table>
                 </div>
             </div>
@@ -735,21 +905,21 @@ def main() -> None:
 
         st.markdown(
             f"""
-            <div class="flow-card" style="border-left: 4px solid {INTERVENTION_COLORS.get(decision, '#4f46e5')};">
+            <div class="flow-card" style="border-left: 4px solid {INTERVENTION_COLORS.get(decision, '#3395FF')};">
                 <div class="flow-card-header">
                     <span class="flow-card-title">② Autonomous Decision Output</span>
                     {guardrail_badge}
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span class="badge badge-{decision}" style="font-size: 1.1rem; padding: 5px 14px;">{decision.replace('_', ' ').upper()}</span>
-                    <span style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">EV: ₹{ev_val:,.2f}</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <span class="badge badge-{decision}" style="font-size: 1.05rem; padding: 6px 16px;">{decision.replace('_', ' ').upper()}</span>
+                    <span style="font-size: 1.3rem; font-weight: 700; color: #F8FAFC;">EV: ₹{ev_val:,.2f}</span>
                 </div>
-                <div style="font-size: 0.86rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.5;">
-                    <b style="color: #475569;">Decision Rationale:</b><br>{reason}
+                <div class="rationale-box">
+                    <b>Decision Rationale:</b><br>{reason}
                 </div>
-                <div style="font-size: 0.84rem; color: #475569; display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-                    <span>Environment Realization:</span>
-                    {'<span style="color: #059669; font-weight: 600;">✓ RECOVERED (₹' + f"{sim_outcome['recovered_amount']:,.2f}" + f" in {sim_outcome['recovery_time_hours']:.1f}h)</span>" if sim_outcome['payment_recovered'] else '<span style="color: #dc2626; font-weight: 600;">✗ NOT RECOVERED</span>'}
+                <div style="font-size: 0.86rem; color: #94A3B8; display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                    <span style="font-weight: 500;">Environment Realization:</span>
+                    {'<span style="color: #10B981; font-weight: 700;">✓ RECOVERED (₹' + f"{sim_outcome['recovered_amount']:,.2f}" + f" in {sim_outcome['recovery_time_hours']:.1f}h)</span>" if sim_outcome['payment_recovered'] else '<span style="color: #EF4444; font-weight: 700;">✗ NOT RECOVERED</span>'}
                 </div>
             </div>
             """,
@@ -758,7 +928,7 @@ def main() -> None:
 
     # Full All-Evaluated Interventions Matrix
     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size: 0.95rem; font-weight: 600; color: var(--text-color, inherit); margin-bottom: 8px;'>Intervention Expected Value Matrix (All Candidate Modalities)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 600; color: #F8FAFC; margin-bottom: 8px;'>Intervention Expected Value Matrix (All Candidate Modalities)</div>", unsafe_allow_html=True)
 
     matrix_rows = []
     for ev_item in all_evaluated:
@@ -820,7 +990,7 @@ def main() -> None:
     if "whatif_days_since_last_payment" not in st.session_state:
         st.session_state["whatif_days_since_last_payment"] = 14
 
-    st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: var(--text-color, inherit); opacity: 0.85; margin-bottom: 6px;'>PRESET WHAT-IF SCENARIOS:</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.8rem; font-weight: 600; color: #94A3B8; margin-bottom: 6px; letter-spacing: 0.04em;'>PRESET WHAT-IF SCENARIOS:</div>", unsafe_allow_html=True)
     whatif_preset_cols = st.columns(3)
 
     def _apply_whatif_preset(amount: float, reason: str, method: str, age: int, successes: int, failures: int, value: float, sub_age: int, days: int) -> None:
@@ -984,21 +1154,21 @@ def main() -> None:
 
         st.markdown(
             f"""
-            <div class="flow-card" style="border-left: 4px solid {INTERVENTION_COLORS.get(whatif_decision, '#4f46e5')};">
+            <div class="flow-card" style="border-left: 4px solid {INTERVENTION_COLORS.get(whatif_decision, '#3395FF')};">
                 <div class="flow-card-header">
                     <span class="flow-card-title">② Autonomous Decision Output</span>
                     {whatif_guardrail_badge}
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-                    <span class="badge badge-{whatif_decision}" style="font-size: 1.1rem; padding: 5px 14px;">{whatif_decision.replace('_', ' ').upper()}</span>
-                    <span style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">EV: ₹{whatif_ev_val:,.2f}</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <span class="badge badge-{whatif_decision}" style="font-size: 1.05rem; padding: 6px 16px;">{whatif_decision.replace('_', ' ').upper()}</span>
+                    <span style="font-size: 1.3rem; font-weight: 700; color: #F8FAFC;">EV: ₹{whatif_ev_val:,.2f}</span>
                 </div>
-                <div style="font-size: 0.86rem; color: #334155; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; border-radius: 6px; margin-bottom: 12px; line-height: 1.5;">
-                    <b style="color: #475569;">Decision Rationale:</b><br>{whatif_reason}
+                <div class="rationale-box">
+                    <b>Decision Rationale:</b><br>{whatif_reason}
                 </div>
-                <div style="font-size: 0.84rem; color: #475569; display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
-                    <span>Environment Realization:</span>
-                    {'<span style="color: #059669; font-weight: 600;">✓ RECOVERED (₹' + f"{whatif_sim['recovered_amount']:,.2f}" + f" in {whatif_sim['recovery_time_hours']:.1f}h)</span>" if whatif_sim['payment_recovered'] else '<span style="color: #dc2626; font-weight: 600;">✗ NOT RECOVERED</span>'}
+                <div style="font-size: 0.86rem; color: #94A3B8; display: flex; justify-content: space-between; align-items: center; padding-top: 4px;">
+                    <span style="font-weight: 500;">Environment Realization:</span>
+                    {'<span style="color: #10B981; font-weight: 700;">✓ RECOVERED (₹' + f"{whatif_sim['recovered_amount']:,.2f}" + f" in {whatif_sim['recovery_time_hours']:.1f}h)</span>" if whatif_sim['payment_recovered'] else '<span style="color: #EF4444; font-weight: 700;">✗ NOT RECOVERED</span>'}
                 </div>
             </div>
             """,
@@ -1007,7 +1177,7 @@ def main() -> None:
 
     # Full All-Evaluated Interventions Matrix for What-If row
     st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    st.markdown("<div style='font-size: 0.95rem; font-weight: 600; color: var(--text-color, inherit); margin-bottom: 8px;'>What-If Intervention Expected Value Matrix</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 0.95rem; font-weight: 600; color: #F8FAFC; margin-bottom: 8px;'>What-If Intervention Expected Value Matrix</div>", unsafe_allow_html=True)
 
     whatif_matrix_rows = []
     for ev_item in whatif_all_evaluated:
@@ -1066,17 +1236,17 @@ def main() -> None:
 
             st.markdown(
                 f"""
-                <div class="flow-card" style="border-top: 3px solid {INTERVENTION_COLORS.get(dec, '#4f46e5')};">
+                <div class="flow-card" style="border-top: 3px solid {INTERVENTION_COLORS.get(dec, '#3395FF')};">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">{p_id}</span>
+                        <span style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC;">{p_id}</span>
                         {match_badge}
                     </div>
                     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
                         <span class="badge badge-{dec}" style="font-size: 0.88rem; padding: 4px 10px;">{dec.replace('_', ' ').upper()}</span>
-                        <span style="font-size: 1.05rem; font-weight: 700; color: #0f172a;">EV: ₹{ev:,.2f}</span>
+                        <span style="font-size: 1.05rem; font-weight: 700; color: #F8FAFC;">EV: ₹{ev:,.2f}</span>
                     </div>
-                    <div style="font-size: 0.86rem; color: #334155; line-height: 1.6; background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px;">
-                        <b style="color: #475569;">Agent Explanation:</b><br>{reason_text}
+                    <div class="rationale-box" style="margin-bottom: 0;">
+                        <b>Agent Explanation:</b><br>{reason_text}
                     </div>
                 </div>
                 """,
@@ -1086,3 +1256,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
